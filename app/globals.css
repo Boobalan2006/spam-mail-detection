@@ -1,0 +1,326 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;// components/email-analysis-panel.tsx (updated)
+    "use client"
+
+    import type React from "react"
+    import { useState } from "react"
+    import { AlertCircle, ChevronDown, FileUp, Globe, Loader2 } from "lucide-react"
+
+    import { Button } from "@/components/ui/button"
+    import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+    import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+    import { Label } from "@/components/ui/label"
+    import { Switch } from "@/components/ui/switch"
+    import { Textarea } from "@/components/ui/textarea"
+    import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+    import { toast } from "sonner"
+    import { isAuthenticated } from "@/lib/api"
+    import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+    import { SimplifiedAuth } from "./simplified-auth"
+
+    export function EmailAnalysisPanel() {
+      const [emailContent, setEmailContent] = useState("")
+      const [isLoading, setIsLoading] = useState(false)
+      const [selectedModel, setSelectedModel] = useState("Multinomial Naive Bayes")
+      const [translateToEnglish, setTranslateToEnglish] = useState(false)
+      const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null)
+      const [authDialogOpen, setAuthDialogOpen] = useState(false)
+
+      const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+          const reader = new FileReader()
+          reader.onload = (event) => {
+            if (event.target?.result) {
+              setEmailContent(event.target.result as string)
+              // Simulate language detection
+              setTimeout(() => {
+                setDetectedLanguage("English")
+              }, 500)
+            }
+          }
+          reader.readAsText(file)
+        }
+      }
+
+      const handleSubmit = async () => {
+        if (!emailContent.trim()) return
+
+        // Check if user is authenticated
+        if (!isAuthenticated()) {
+          setAuthDialogOpen(true)
+          return
+        }
+
+        setIsLoading(true)
+        try {
+          // Get auth token
+          const token = localStorage.getItem('auth_token')
+          if (!token) {
+            throw new Error('No authentication token found')
+          }
+          
+          // Make API call to the Flask backend
+          const response = await fetch('http://localhost:5000/predict', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              message: emailContent // Send single message instead of array
+            }),
+            credentials: 'include' // Include credentials for CORS
+          })
+          
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status}`)
+          }
+          
+          const data = await response.json()
+          
+          if (data.prediction) {
+            // Format the result for the frontend
+            const result = {
+              prediction: data.prediction,
+              confidence: data.confidence,
+              probabilities: data.probabilities
+            }
+            
+            // Dispatch an event that the results panel can listen for
+            const event = new CustomEvent("emailAnalyzed", { 
+              detail: { result, model: selectedModel } 
+            })
+            window.dispatchEvent(event)
+            
+            // Show success toast
+            toast.success("Email analyzed successfully", {
+              description: `Prediction: ${data.prediction} (${data.confidence}% confidence)`
+            })
+          } else {
+            throw new Error('Invalid response format from API')
+          }
+        } catch (error) {
+          console.error("Error analyzing email:", error)
+          
+          // Dispatch error event
+          const event = new CustomEvent("apiError", { 
+            detail: { message: error.message || "Failed to analyze email. Please check if the backend server is running." } 
+          })
+          window.dispatchEvent(event)
+          
+          // Show error toast
+          toast.error("Failed to analyze email", {
+            description: error.message || "Please check if the backend server is running."
+          })
+        } finally {
+          setIsLoading(false)
+        }
+      }
+
+      const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setEmailContent(e.target.value)
+        if (e.target.value.trim()) {
+          // Simulate language detection when text changes
+          setTimeout(() => {
+            setDetectedLanguage("English")
+          }, 500)
+        } else {
+          setDetectedLanguage(null)
+        }
+      }
+
+      const handleAuthSuccess = () => {
+        setAuthDialogOpen(false)
+        // Try to submit again after successful authentication
+        handleSubmit()
+      }
+
+      return (
+        <>
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle>Email Analysis</CardTitle>
+              <CardDescription>Paste an email or upload a file to analyze for spam content.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email-content">Email Content</Label>
+                <Textarea
+                  id="email-content"
+                  placeholder="Paste your email content here..."
+                  className="min-h-[200px] resize-none"
+                  value={emailContent}
+                  onChange={handleTextChange}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-4 items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => document.getElementById("file-upload")?.click()}>
+                    <FileUp className="mr-2 h-4 w-4" />
+                    Upload File
+                  </Button>
+                  <input id="file-upload" type="file" accept=".txt,.eml" className="hidden" onChange={handleFileUpload} />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <AlertCircle className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Supported file formats: .txt, .eml</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Model: {selectedModel}
+                      <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setSelectedModel("Multinomial Naive Bayes")}>
+                      Multinomial Naive Bayes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSelectedModel("Logistic Regression")}>
+                      Logistic Regression
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {detectedLanguage && (
+                <div className="flex items-center justify-between border rounded-md p-3 bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">
+                      Detected Language: <strong>{detectedLanguage}</strong>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="translate" className="text-sm cursor-pointer">
+                      Translate to English
+                    </Label>
+                    <Switch
+                      id="translate"
+                      checked={translateToEnglish}
+                      onCheckedChange={setTranslateToEnglish}
+                      disabled={detectedLanguage === "English"}
+                    />
+                  </div>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleSubmit}
+                disabled={!emailContent.trim() || isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  "Check Spam"
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Authentication Dialog */}
+          <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Authentication Required</DialogTitle>
+                <DialogDescription>
+                  Please login or register to analyze emails
+                </DialogDescription>
+              </DialogHeader>
+              <SimplifiedAuth onAuthSuccess={handleAuthSuccess} />
+            </DialogContent>
+          </Dialog>
+        </>
+      )
+    }
+
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+
+    /* Sidebar specific colors */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 10% 3.9%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-ring: 240 5.9% 10%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+
+    /* Sidebar specific colors */
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-ring: 240 4.9% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
