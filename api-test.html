@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spam Detector API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input, textarea {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .image-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Spam Detector API Test</h1>
+    
+    <div class="section">
+        <h2>1. Test API Connection</h2>
+        <button onclick="testAPI()">Test API Connection</button>
+        <pre id="api-result">Results will appear here...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>2. Authentication</h2>
+        <div>
+            <input type="text" id="email" placeholder="Email" value="demo@example.com" />
+            <input type="password" id="password" placeholder="Password" value="password123" />
+            <button onclick="login()">Login</button>
+            <button onclick="register()">Register</button>
+        </div>
+        <pre id="auth-result">Auth results will appear here...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>3. Upload File for Analysis</h2>
+        <div>
+            <input type="file" id="file-upload" accept=".txt,.csv" />
+            <button onclick="uploadFile()">Analyze File</button>
+        </div>
+        <pre id="upload-result">Upload results will appear here...</pre>
+    </div>
+    
+    <div class="section">
+        <h2>4. Get Visualizations</h2>
+        <div>
+            <input type="text" id="batch-id" placeholder="Enter batch ID" />
+            <button onclick="getVisualizations()">Get Visualizations</button>
+        </div>
+        <pre id="viz-result">Visualization results will appear here...</pre>
+        
+        <div class="image-container">
+            <h3>Pie Chart</h3>
+            <img id="pie-chart" alt="Pie Chart" />
+        </div>
+        
+        <div class="image-container">
+            <h3>Confidence Histogram</h3>
+            <img id="confidence-histogram" alt="Confidence Histogram" />
+        </div>
+        
+        <div class="image-container">
+            <h3>Word Influence</h3>
+            <img id="word-influence" alt="Word Influence" />
+        </div>
+    </div>
+    
+    <script>
+        // API base URL
+        const API_URL = 'http://localhost:5001';
+        
+        // Test basic API connection
+        async function testAPI() {
+            const resultElement = document.getElementById('api-result');
+            resultElement.textContent = 'Testing API connection...';
+            
+            try {
+                const response = await fetch(`${API_URL}/`);
+                const data = await response.json();
+                resultElement.textContent = JSON.stringify(data, null, 2);
+                console.log('API response:', data);
+            } catch (error) {
+                resultElement.textContent = `Error: ${error.message}`;
+                console.error('API error:', error);
+            }
+        }
+        
+        // Login function
+        async function login() {
+            const resultElement = document.getElementById('auth-result');
+            resultElement.textContent = 'Logging in...';
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                resultElement.textContent = 'Please enter email and password';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.access_token) {
+                    localStorage.setItem('auth_token', data.access_token);
+                    localStorage.setItem('user_data', JSON.stringify(data.user));
+                    resultElement.innerHTML = '<span class="success">Login successful!</span><br>' + JSON.stringify(data, null, 2);
+                } else {
+                    resultElement.innerHTML = '<span class="error">Login failed!</span><br>' + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultElement.textContent = `Error: ${error.message}`;
+                console.error('Login error:', error);
+            }
+        }
+        
+        // Register function
+        async function register() {
+            const resultElement = document.getElementById('auth-result');
+            resultElement.textContent = 'Registering...';
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                resultElement.textContent = 'Please enter email and password';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        username: email.split('@')[0],
+                        email, 
+                        password 
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Register response:', data);
+                
+                if (data.access_token) {
+                    localStorage.setItem('auth_token', data.access_token);
+                    localStorage.setItem('user_data', JSON.stringify(data.user));
+                    resultElement.innerHTML = '<span class="success">Registration successful!</span><br>' + JSON.stringify(data, null, 2);
+                } else {
+                    resultElement.innerHTML = '<span class="error">Registration failed!</span><br>' + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultElement.textContent = `Error: ${error.message}`;
+                console.error('Registration error:', error);
+            }
+        }
+        
+        // Upload and analyze file
+        async function uploadFile() {
+            const resultElement = document.getElementById('upload-result');
+            resultElement.textContent = 'Uploading and analyzing file...';
+            
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                resultElement.textContent = 'Please select a file';
+                return;
+            }
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                resultElement.textContent = 'Please login first';
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await fetch(`${API_URL}/bulk-analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                console.log('Upload response:', data);
+                
+                if (data.batch_id) {
+                    document.getElementById('batch-id').value = data.batch_id;
+                    resultElement.innerHTML = '<span class="success">File analyzed successfully!</span><br>' + JSON.stringify(data, null, 2);
+                } else {
+                    resultElement.innerHTML = '<span class="error">Analysis failed!</span><br>' + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultElement.textContent = `Error: ${error.message}`;
+                console.error('Upload error:', error);
+            }
+        }
+        
+        // Get visualizations
+        async function getVisualizations() {
+            const resultElement = document.getElementById('viz-result');
+            resultElement.textContent = 'Fetching visualizations...';
+            
+            const batchId = document.getElementById('batch-id').value;
+            
+            if (!batchId) {
+                resultElement.textContent = 'Please enter a batch ID';
+                return;
+            }
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                resultElement.textContent = 'Please login first';
+                return;
+            }
+            
+            try {
+                console.log(`Fetching visualizations for batch ${batchId}`);
+                console.log(`Using token: ${token.substring(0, 10)}...`);
+                
+                const response = await fetch(`${API_URL}/report/${batchId}/visualizations`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', Object.fromEntries([...response.headers]));
+                
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Visualization data:', data);
+                
+                if (data.visualizations) {
+                    resultElement.innerHTML = '<span class="success">Visualizations loaded successfully!</span>';
+                    
+                    if (data.visualizations.pie_chart) {
+                        document.getElementById('pie-chart').src = `data:image/png;base64,${data.visualizations.pie_chart}`;
+                    }
+                    
+                    if (data.visualizations.confidence_histogram) {
+                        document.getElementById('confidence-histogram').src = `data:image/png;base64,${data.visualizations.confidence_histogram}`;
+                    }
+                    
+                    if (data.visualizations.word_influence) {
+                        document.getElementById('word-influence').src = `data:image/png;base64,${data.visualizations.word_influence}`;
+                    }
+                } else {
+                    resultElement.innerHTML = '<span class="error">No visualization data found in response</span><br>' + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultElement.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                console.error('Visualization error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

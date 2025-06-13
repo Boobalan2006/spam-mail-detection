@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Spam Detector File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Spam Detector File Upload Test</h1>
+    
+    <div class="section">
+        <h2>1. Login</h2>
+        <button onclick="login()">Login as Demo User</button>
+        <button onclick="checkToken()">Check Token</button>
+        <pre id="login-result">Login status will appear here</pre>
+    </div>
+    
+    <div class="section">
+        <h2>2. Upload File</h2>
+        <form id="upload-form">
+            <input type="file" id="file" name="file" accept=".txt,.csv">
+            <button type="button" onclick="uploadFile()">Upload File</button>
+        </form>
+        <pre id="upload-result">Upload result will appear here</pre>
+    </div>
+    
+    <script>
+        // Login function
+        async function login() {
+            const resultElement = document.getElementById('login-result');
+            resultElement.textContent = 'Logging in...';
+            
+            try {
+                const response = await fetch('http://localhost:5000/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'demo@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.access_token) {
+                    localStorage.setItem('auth_token', data.access_token);
+                    resultElement.textContent = 'Login successful! Token saved.';
+                } else {
+                    resultElement.textContent = 'Login failed: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+                console.error('Login error:', error);
+            }
+        }
+        
+        // Check token function
+        function checkToken() {
+            const resultElement = document.getElementById('login-result');
+            const token = localStorage.getItem('auth_token');
+            
+            if (token) {
+                resultElement.textContent = 'Token exists: ' + token.substring(0, 20) + '...';
+            } else {
+                resultElement.textContent = 'No token found in localStorage';
+            }
+        }
+        
+        // Upload file function
+        async function uploadFile() {
+            const resultElement = document.getElementById('upload-result');
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                resultElement.textContent = 'Please select a file first';
+                return;
+            }
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                resultElement.textContent = 'Please login first';
+                return;
+            }
+            
+            resultElement.textContent = 'Uploading file...';
+            
+            try {
+                // Create FormData object
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                // Log what we're sending
+                console.log('Sending file:', file.name, 'Size:', file.size, 'bytes');
+                console.log('Using token:', token.substring(0, 10) + '...');
+                
+                // Make the request with no Content-Type header (browser will set it with boundary)
+                const response = await fetch('http://localhost:5000/bulk-analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Upload response:', data);
+                
+                if (data.batch_id) {
+                    resultElement.textContent = 'Upload successful!\n\nBatch ID: ' + data.batch_id + '\n\nFull response: ' + JSON.stringify(data, null, 2);
+                    
+                    // Store batch ID for later use
+                    localStorage.setItem('last_batch_id', data.batch_id);
+                    
+                    // Add button to get visualizations
+                    const vizButton = document.createElement('button');
+                    vizButton.textContent = 'Get Visualizations';
+                    vizButton.onclick = getVisualizations;
+                    resultElement.parentNode.appendChild(vizButton);
+                } else {
+                    resultElement.textContent = 'Upload failed: ' + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+                console.error('Upload error:', error);
+            }
+        }
+        
+        // Get visualizations function
+        async function getVisualizations() {
+            const batchId = localStorage.getItem('last_batch_id');
+            if (!batchId) {
+                alert('No batch ID found. Please upload a file first.');
+                return;
+            }
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+            
+            // Create visualization section if it doesn't exist
+            let vizSection = document.getElementById('viz-section');
+            if (!vizSection) {
+                vizSection = document.createElement('div');
+                vizSection.id = 'viz-section';
+                vizSection.className = 'section';
+                vizSection.innerHTML = `
+                    <h2>3. Visualizations</h2>
+                    <pre id="viz-result">Loading visualizations...</pre>
+                    <div id="viz-images"></div>
+                `;
+                document.body.appendChild(vizSection);
+            }
+            
+            const resultElement = document.getElementById('viz-result');
+            resultElement.textContent = 'Loading visualizations...';
+            
+            try {
+                console.log(`Fetching visualizations for batch ${batchId}`);
+                console.log(`Using token: ${token.substring(0, 10)}...`);
+                
+                const response = await fetch(`http://localhost:5000/report/${batchId}/visualizations`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Visualization data:', data);
+                
+                if (data.visualizations) {
+                    resultElement.textContent = 'Visualizations loaded successfully!';
+                    
+                    const imagesDiv = document.getElementById('viz-images');
+                    imagesDiv.innerHTML = '';
+                    
+                    // Display each visualization
+                    for (const [key, value] of Object.entries(data.visualizations)) {
+                        const container = document.createElement('div');
+                        container.style.marginBottom = '20px';
+                        
+                        const title = document.createElement('h3');
+                        title.textContent = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        
+                        const img = document.createElement('img');
+                        img.src = `data:image/png;base64,${value}`;
+                        img.alt = key;
+                        
+                        container.appendChild(title);
+                        container.appendChild(img);
+                        imagesDiv.appendChild(container);
+                    }
+                } else {
+                    resultElement.textContent = 'No visualization data found in response: ' + JSON.stringify(data);
+                }
+            } catch (error) {
+                resultElement.textContent = 'Error: ' + error.message;
+                console.error('Visualization error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

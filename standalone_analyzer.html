@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone Email Analyzer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .spam {
+            color: #e74c3c;
+        }
+        .ham {
+            color: #2ecc71;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .badge-spam {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .badge-ham {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .chart-container {
+            margin-top: 30px;
+        }
+        .bar-chart {
+            display: flex;
+            height: 300px;
+            align-items: flex-end;
+            margin-top: 20px;
+        }
+        .bar {
+            flex: 1;
+            margin: 0 5px;
+            background-color: #3498db;
+            transition: height 0.5s ease;
+            position: relative;
+            min-width: 30px;
+        }
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+        .bar-value {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+        .word-influence {
+            display: flex;
+            flex-direction: column;
+            margin-top: 20px;
+        }
+        .word-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .word-label {
+            width: 120px;
+            text-align: right;
+            padding-right: 10px;
+            font-size: 0.9rem;
+        }
+        .word-bar-container {
+            flex-grow: 1;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            height: 20px;
+        }
+        .word-bar-fill {
+            height: 100%;
+            background-color: #3498db;
+            border-radius: 4px;
+        }
+        .word-value {
+            width: 50px;
+            text-align: right;
+            padding-left: 10px;
+            font-size: 0.9rem;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 2px solid #3498db;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .pie-chart {
+            width: 250px;
+            height: 250px;
+            position: relative;
+            margin: 0 auto;
+        }
+        .pie-chart-legend {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 0 15px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Standalone Email Analyzer</h1>
+        <p>Analyze multiple emails for spam detection without requiring a backend server.</p>
+        
+        <div class="card">
+            <h2>Input Emails</h2>
+            <p>Enter one email per line:</p>
+            <textarea id="emailInput" placeholder="Enter emails here, one per line..."></textarea>
+            <button id="analyzeBtn">Analyze Emails</button>
+        </div>
+        
+        <div id="resultsContainer" style="display: none;">
+            <div class="tabs">
+                <div class="tab active" data-tab="summary">Summary</div>
+                <div class="tab" data-tab="details">Details</div>
+                <div class="tab" data-tab="visualizations">Visualizations</div>
+            </div>
+            
+            <div id="summaryTab" class="tab-content active">
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <h3>Total Emails</h3>
+                        <div id="totalEmails" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Spam Detected</h3>
+                        <div id="spamCount" class="stat-value spam">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Ham Detected</h3>
+                        <div id="hamCount" class="stat-value ham">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Spam Percentage</h3>
+                        <div id="spamPercentage" class="stat-value">0%</div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <h3>Distribution</h3>
+                    <div class="pie-chart" id="pieChart"></div>
+                    <div class="pie-chart-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #e74c3c;"></div>
+                            <div>Spam</div>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #2ecc71;"></div>
+                            <div>Ham</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="detailsTab" class="tab-content">
+                <table id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Result</th>
+                            <th>Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody"></tbody>
+                </table>
+            </div>
+            
+            <div id="visualizationsTab" class="tab-content">
+                <div class="chart-container">
+                    <h3>Confidence Distribution</h3>
+                    <div class="bar-chart" id="confidenceChart"></div>
+                </div>
+                
+                <div class="chart-container">
+                    <h3>Top Influential Words</h3>
+                    <div class="word-influence" id="wordInfluence"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Spam detection keywords and patterns
+        const spamKeywords = [
+            'win', 'won', 'winner', 'prize', 'claim', 'offer', 'free', 'discount', 'limited', 
+            'click', 'buy', 'cash', 'money', 'credit', 'loan', 'debt', 'income', 'earn', 
+            'guarantee', 'cheap', 'deal', 'sale', 'save', 'discount', 'opportunity', 'investment',
+            'singles', 'dating', 'weight', 'diet', 'crypto', 'bitcoin', 'followers', 'traffic',
+            'prescription', 'meds', 'viagra', 'cialis', 'pharmacy', 'drugs', 'pills', 'medication',
+            'casino', 'bet', 'gambling', 'lottery', 'jackpot', 'slots', 'poker', 'bingo',
+            'urgent', 'act now', 'limited time', 'expires', 'today only', 'instant', 'immediately',
+            'congratulations', 'selected', 'exclusive', 'special', 'vip', 'luxury', 'premium',
+            'million', 'thousand', 'dollar', 'cash', 'money', 'payment', 'bank', 'account',
+            'verify', 'verification', 'confirm', 'update', 'security', 'password', 'login',
+            'subscription', 'expired', 'renew', 'upgrade', 'membership', 'access', 'activate'
+        ];
+
+        // Ham (legitimate) keywords and patterns
+        const hamKeywords = [
+            'meeting', 'schedule', 'reschedule', 'appointment', 'reminder', 'tomorrow', 'today',
+            'project', 'report', 'document', 'presentation', 'slides', 'notes', 'feedback',
+            'team', 'group', 'colleague', 'coworker', 'manager', 'supervisor', 'client',
+            'call', 'phone', 'email', 'message', 'chat', 'discuss', 'talk', 'conversation',
+            'question', 'answer', 'help', 'assist', 'support', 'guidance', 'advice',
+            'thanks', 'thank you', 'appreciate', 'grateful', 'happy', 'glad', 'pleased',
+            'review', 'check', 'examine', 'analyze', 'evaluate', 'assess', 'consider',
+            'update', 'status', 'progress', 'development', 'improvement', 'enhancement',
+            'lunch', 'dinner', 'breakfast', 'coffee', 'drink', 'meal', 'food', 'restaurant',
+            'available', 'unavailable', 'busy', 'free', 'time', 'date', 'day', 'week', 'month',
+            'please', 'kindly', 'would', 'could', 'should', 'might', 'may', 'can'
+        ];
+
+        // Function to analyze a single email
+        function analyzeEmail(email) {
+            let spamScore = 0;
+            let hamScore = 0;
+            
+            // Convert to lowercase for case-insensitive matching
+            const lowerEmail = email.toLowerCase();
+            
+            // Check for spam keywords
+            spamKeywords.forEach(keyword => {
+                if (lowerEmail.includes(keyword.toLowerCase())) {
+                    spamScore += 1;
+                }
+            });
+            
+            // Check for ham keywords
+            hamKeywords.forEach(keyword => {
+                if (lowerEmail.includes(keyword.toLowerCase())) {
+                    hamScore += 1;
+                }
+            });
+            
+            // Additional spam patterns
+            if (lowerEmail.includes('$') && /\d+/.test(lowerEmail)) spamScore += 2; // Money amounts
+            if (lowerEmail.includes('!')) spamScore += lowerEmail.split('!').length - 1; // Exclamation marks
+            if (lowerEmail.includes('click here')) spamScore += 3;
+            if (lowerEmail.includes('limited time')) spamScore += 2;
+            if (lowerEmail.includes('act now')) spamScore += 2;
+            if (lowerEmail.includes('guarantee')) spamScore += 2;
+            if (lowerEmail.includes('no experience')) spamScore += 2;
+            if (lowerEmail.includes('earn money')) spamScore += 3;
+            if (lowerEmail.includes('credit card')) spamScore += 1;
+            if (lowerEmail.includes('free trial')) spamScore += 1;
+            
+            // Additional ham patterns
+            if (lowerEmail.includes('meeting')) hamScore += 2;
+            if (lowerEmail.includes('project')) hamScore += 2;
+            if (lowerEmail.includes('report')) hamScore += 2;
+            if (lowerEmail.includes('thanks')) hamScore += 2;
+            if (lowerEmail.includes('please')) hamScore += 1;
+            if (lowerEmail.includes('let me know')) hamScore += 2;
+            if (lowerEmail.includes('attached')) hamScore += 2;
+            if (lowerEmail.includes('deadline')) hamScore += 1;
+            if (lowerEmail.includes('team')) hamScore += 1;
+            if (lowerEmail.includes('feedback')) hamScore += 2;
+            
+            // Calculate final prediction
+            const totalScore = spamScore + hamScore;
+            const spamProbability = totalScore > 0 ? (spamScore / totalScore) : 0.5;
+            const confidence = Math.round(Math.max(spamProbability, 1 - spamProbability) * 100);
+            
+            // Get influential words
+            const words = lowerEmail.split(/\s+/);
+            const wordInfluence = [];
+            
+            words.forEach(word => {
+                word = word.replace(/[.,!?;:()"']/g, '').toLowerCase();
+                if (word.length < 3) return; // Skip short words
+                
+                let influence = 0;
+                
+                if (spamKeywords.includes(word)) {
+                    influence = 0.8;
+                } else if (hamKeywords.includes(word)) {
+                    influence = -0.8;
+                }
+                
+                // Additional specific word scoring
+                if (word === 'free') influence = 0.9;
+                if (word === 'money') influence = 0.85;
+                if (word === 'win') influence = 0.9;
+                if (word === 'click') influence = 0.8;
+                if (word === 'meeting') influence = -0.9;
+                if (word === 'project') influence = -0.85;
+                if (word === 'report') influence = -0.8;
+                if (word === 'thanks') influence = -0.9;
+                
+                if (influence !== 0) {
+                    wordInfluence.push({ word, influence });
+                }
+            });
+            
+            // Sort by absolute influence
+            wordInfluence.sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence));
+            
+            return {
+                message: email,
+                prediction: spamProbability > 0.5 ? 'spam' : 'ham',
+                confidence: confidence,
+                spamScore: spamScore,
+                hamScore: hamScore,
+                wordInfluence: wordInfluence.slice(0, 10) // Top 10 influential words
+            };
+        }
+
+        // Function to analyze all emails
+        function analyzeEmails() {
+            const emailText = document.getElementById('emailInput').value;
+            const emails = emailText.split('\n').filter(email => email.trim() !== '');
+            
+            if (emails.length === 0) {
+                alert('Please enter at least one email to analyze.');
+                return;
+            }
+            
+            const results = emails.map(analyzeEmail);
+            displayResults(results);
+        }
+
+        // Function to display results
+        function displayResults(results) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            resultsContainer.style.display = 'block';
+            
+            // Calculate summary statistics
+            const totalEmails = results.length;
+            const spamCount = results.filter(r => r.prediction === 'spam').length;
+            const hamCount = results.filter(r => r.prediction === 'ham').length;
+            const spamPercentage = Math.round((spamCount / totalEmails) * 100);
+            
+            // Update summary tab
+            document.getElementById('totalEmails').textContent = totalEmails;
+            document.getElementById('spamCount').textContent = spamCount;
+            document.getElementById('hamCount').textContent = hamCount;
+            document.getElementById('spamPercentage').textContent = spamPercentage + '%';
+            
+            // Update details tab
+            const resultsBody = document.getElementById('resultsBody');
+            resultsBody.innerHTML = '';
+            
+            results.forEach(result => {
+                const row = document.createElement('tr');
+                
+                const messageCell = document.createElement('td');
+                messageCell.textContent = result.message.length > 50 ? 
+                    result.message.substring(0, 50) + '...' : result.message;
+                
+                const resultCell = document.createElement('td');
+                const badge = document.createElement('span');
+                badge.className = `badge badge-${result.prediction}`;
+                badge.textContent = result.prediction;
+                resultCell.appendChild(badge);
+                
+                const confidenceCell = document.createElement('td');
+                confidenceCell.textContent = result.confidence + '%';
+                
+                row.appendChild(messageCell);
+                row.appendChild(resultCell);
+                row.appendChild(confidenceCell);
+                
+                resultsBody.appendChild(row);
+            });
+            
+            // Create pie chart
+            createPieChart('pieChart', spamCount, hamCount);
+            
+            // Create confidence distribution chart
+            createConfidenceChart('confidenceChart', results);
+            
+            // Create word influence chart
+            createWordInfluenceChart('wordInfluence', results);
+        }
+
+        // Function to create a pie chart
+        function createPieChart(elementId, spamCount, hamCount) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 250;
+            canvas.height = 250;
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 10;
+            
+            const total = spamCount + hamCount;
+            const spamAngle = (spamCount / total) * 2 * Math.PI;
+            
+            // Draw spam slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, 0, spamAngle);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fill();
+            
+            // Draw ham slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, spamAngle, 2 * Math.PI);
+            ctx.fillStyle = '#2ecc71';
+            ctx.fill();
+            
+            // Add to DOM
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            container.appendChild(canvas);
+            
+            // Add percentages
+            if (spamCount > 0) {
+                const spamPercent = Math.round((spamCount / total) * 100);
+                const spamLabel = document.createElement('div');
+                spamLabel.textContent = spamPercent + '%';
+                spamLabel.style.position = 'absolute';
+                spamLabel.style.left = centerX + Math.cos(spamAngle / 2) * radius * 0.7 + 'px';
+                spamLabel.style.top = centerY + Math.sin(spamAngle / 2) * radius * 0.7 + 'px';
+                spamLabel.style.color = 'white';
+                spamLabel.style.fontWeight = 'bold';
+                container.appendChild(spamLabel);
+            }
+            
+            if (hamCount > 0) {
+                const hamPercent = Math.round((hamCount / total) * 100);
+                const hamLabel = document.createElement('div');
+                hamLabel.textContent = hamPercent + '%';
+                hamLabel.style.position = 'absolute';
+                hamLabel.style.left = centerX + Math.cos(spamAngle + (Math.PI - spamAngle) / 2) * radius * 0.7 + 'px';
+                hamLabel.style.top = centerY + Math.sin(spamAngle + (Math.PI - spamAngle) / 2) * radius * 0.7 + 'px';
+                hamLabel.style.color = 'white';
+                hamLabel.style.fontWeight = 'bold';
+                container.appendChild(hamLabel);
+            }
+        }
+
+        // Function to create confidence distribution chart
+        function createConfidenceChart(elementId, results) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            
+            // Group confidences into bins
+            const bins = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // 10 bins: 0-10%, 10-20%, ..., 90-100%
+            
+            results.forEach(result => {
+                const binIndex = Math.min(Math.floor(result.confidence / 10), 9);
+                bins[binIndex]++;
+            });
+            
+            // Find max value for scaling
+            const maxValue = Math.max(...bins);
+            
+            // Create bars
+            bins.forEach((value, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                
+                const height = value > 0 ? (value / maxValue) * 100 : 0;
+                bar.style.height = height + '%';
+                
+                // Color based on confidence range
+                const hue = index * 12; // 0 to 108 (green)
+                bar.style.backgroundColor = `hsl(${hue}, 70%, 50%)`;
+                
+                // Add label
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.textContent = `${index * 10}-${(index + 1) * 10}%`;
+                bar.appendChild(label);
+                
+                // Add value
+                if (value > 0) {
+                    const valueLabel = document.createElement('div');
+                    valueLabel.className = 'bar-value';
+                    valueLabel.textContent = value;
+                    bar.appendChild(valueLabel);
+                }
+                
+                container.appendChild(bar);
+            });
+        }
+
+        // Function to create word influence chart
+        function createWordInfluenceChart(elementId, results) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            
+            // Aggregate word influences across all emails
+            const wordInfluenceMap = {};
+            
+            results.forEach(result => {
+                result.wordInfluence.forEach(({ word, influence }) => {
+                    if (wordInfluenceMap[word]) {
+                        wordInfluenceMap[word] += influence;
+                    } else {
+                        wordInfluenceMap[word] = influence;
+                    }
+                });
+            });
+            
+            // Convert to array and sort
+            const wordInfluenceArray = Object.entries(wordInfluenceMap)
+                .map(([word, influence]) => ({ word, influence }))
+                .sort((a, b) => Math.abs(b.influence) - Math.abs(a.influence))
+                .slice(0, 15); // Top 15 words
+            
+            // Find max absolute influence for scaling
+            const maxInfluence = Math.max(...wordInfluenceArray.map(item => Math.abs(item.influence)));
+            
+            // Create bars
+            wordInfluenceArray.forEach(({ word, influence }) => {
+                const wordBar = document.createElement('div');
+                wordBar.className = 'word-bar';
+                
+                const wordLabel = document.createElement('div');
+                wordLabel.className = 'word-label';
+                wordLabel.textContent = word;
+                
+                const barContainer = document.createElement('div');
+                barContainer.className = 'word-bar-container';
+                
+                const barFill = document.createElement('div');
+                barFill.className = 'word-bar-fill';
+                
+                const width = (Math.abs(influence) / maxInfluence) * 100;
+                barFill.style.width = width + '%';
+                
+                // Color based on influence (red for spam, green for ham)
+                barFill.style.backgroundColor = influence > 0 ? '#e74c3c' : '#2ecc71';
+                
+                const valueLabel = document.createElement('div');
+                valueLabel.className = 'word-value';
+                valueLabel.textContent = influence.toFixed(2);
+                
+                barContainer.appendChild(barFill);
+                wordBar.appendChild(wordLabel);
+                wordBar.appendChild(barContainer);
+                wordBar.appendChild(valueLabel);
+                
+                container.appendChild(wordBar);
+            });
+        }
+
+        // Tab switching functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Show corresponding content
+                const tabName = tab.getAttribute('data-tab');
+                document.getElementById(tabName + 'Tab').classList.add('active');
+            });
+        });
+
+        // Initialize with any emails in the textarea
+        document.getElementById('analyzeBtn').addEventListener('click', analyzeEmails);
+        
+        // Pre-populate textarea with sample emails if empty
+        window.addEventListener('DOMContentLoaded', () => {
+            const emailInput = document.getElementById('emailInput');
+            if (emailInput.value.trim() === '') {
+                // Check if we can get emails from the active file
+                const activeFileContent = document.querySelector('activeFileContent');
+                if (activeFileContent && activeFileContent.textContent) {
+                    emailInput.value = activeFileContent.textContent;
+                }
+            }
+        });
+    </script>
+</body>
+</html>

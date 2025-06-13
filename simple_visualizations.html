@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Spam Detection Visualizations</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        input {
+            padding: 8px;
+            width: 300px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .viz-container {
+            margin-top: 20px;
+        }
+        .viz-item {
+            margin-bottom: 30px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .viz-item img {
+            max-width: 100%;
+            height: auto;
+        }
+        #error {
+            color: red;
+            margin: 10px 0;
+        }
+        #loading {
+            margin: 20px 0;
+            font-style: italic;
+            color: #666;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .summary-item {
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .summary-item h3 {
+            margin-top: 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .summary-item p {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 5px 0 0;
+        }
+        .spam-count { color: #e74c3c; }
+        .ham-count { color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Spam Detection Visualizations</h1>
+        <p>Enter your batch ID to view visualizations without automatic reloading.</p>
+        
+        <div class="form-group">
+            <input type="text" id="batchId" placeholder="Enter batch ID">
+            <button onclick="loadData()">Load Visualizations</button>
+        </div>
+        
+        <div id="error" style="display: none;"></div>
+        <div id="loading" style="display: none;">Loading data...</div>
+        
+        <div id="results" style="display: none;">
+            <h2>Analysis Summary</h2>
+            <div id="summary" class="summary-grid"></div>
+            
+            <h2>Visualizations</h2>
+            <div id="visualizations" class="viz-container"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Load data function
+        function loadData() {
+            const batchId = document.getElementById('batchId').value;
+            
+            if (!batchId) {
+                showError("Please enter a batch ID");
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+            
+            // Login first to get a token
+            fetch('http://localhost:5000/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: "demo@example.com",
+                    password: "password123"
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Login failed");
+                }
+                return response.json();
+            })
+            .then(loginData => {
+                const token = loginData.access_token;
+                
+                // Now fetch the report data
+                return fetch(`http://localhost:5000/report/${batchId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch report: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(reportData => {
+                if (!reportData.report) {
+                    throw new Error("Invalid report data");
+                }
+                
+                // Display summary
+                displaySummary(reportData.report);
+                
+                // Get token again for visualization request
+                return fetch('http://localhost:5000/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: "demo@example.com",
+                        password: "password123"
+                    })
+                })
+                .then(response => response.json())
+                .then(loginData => {
+                    const token = loginData.access_token;
+                    
+                    // Fetch visualizations
+                    return fetch(`http://localhost:5000/report/${batchId}/visualizations`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                });
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch visualizations: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(vizData => {
+                // Display visualizations
+                displayVisualizations(vizData.visualizations);
+                
+                // Show results
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                showError(error.message);
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+        
+        // Display summary
+        function displaySummary(report) {
+            const summaryContainer = document.getElementById('summary');
+            summaryContainer.innerHTML = '';
+            
+            // Total emails
+            const totalItem = document.createElement('div');
+            totalItem.className = 'summary-item';
+            totalItem.innerHTML = `
+                <h3>Total Emails</h3>
+                <p>${report.total_emails}</p>
+            `;
+            summaryContainer.appendChild(totalItem);
+            
+            // Spam count
+            const spamItem = document.createElement('div');
+            spamItem.className = 'summary-item';
+            spamItem.innerHTML = `
+                <h3>Spam Detected</h3>
+                <p class="spam-count">${report.spam_count}</p>
+            `;
+            summaryContainer.appendChild(spamItem);
+            
+            // Ham count
+            const hamItem = document.createElement('div');
+            hamItem.className = 'summary-item';
+            hamItem.innerHTML = `
+                <h3>Ham Detected</h3>
+                <p class="ham-count">${report.ham_count}</p>
+            `;
+            summaryContainer.appendChild(hamItem);
+            
+            // Spam percentage
+            const percentItem = document.createElement('div');
+            percentItem.className = 'summary-item';
+            percentItem.innerHTML = `
+                <h3>Spam Percentage</h3>
+                <p>${report.spam_percentage}%</p>
+            `;
+            summaryContainer.appendChild(percentItem);
+        }
+        
+        // Display visualizations
+        function displayVisualizations(visualizations) {
+            const vizContainer = document.getElementById('visualizations');
+            vizContainer.innerHTML = '';
+            
+            if (!visualizations || Object.keys(visualizations).length === 0) {
+                const noVizMessage = document.createElement('div');
+                noVizMessage.className = 'viz-item';
+                noVizMessage.innerHTML = `
+                    <h3>Visualizations Not Available</h3>
+                    <p>The server has not generated visualizations for this batch yet.</p>
+                    <p>Please wait a few moments and try again.</p>
+                    <button onclick="loadData()">Try Again</button>
+                `;
+                vizContainer.appendChild(noVizMessage);
+                return;
+            }
+            
+            // Pie chart
+            if (visualizations.pie_chart) {
+                const pieItem = document.createElement('div');
+                pieItem.className = 'viz-item';
+                pieItem.innerHTML = `
+                    <h3>Spam vs Ham Distribution</h3>
+                    <img src="data:image/png;base64,${visualizations.pie_chart}" alt="Spam vs Ham Distribution">
+                `;
+                vizContainer.appendChild(pieItem);
+            }
+            
+            // Confidence histogram
+            if (visualizations.confidence_histogram) {
+                const histItem = document.createElement('div');
+                histItem.className = 'viz-item';
+                histItem.innerHTML = `
+                    <h3>Confidence Distribution</h3>
+                    <img src="data:image/png;base64,${visualizations.confidence_histogram}" alt="Confidence Distribution">
+                `;
+                vizContainer.appendChild(histItem);
+            }
+            
+            // Word influence
+            if (visualizations.word_influence) {
+                const wordItem = document.createElement('div');
+                wordItem.className = 'viz-item';
+                wordItem.innerHTML = `
+                    <h3>Top Influential Words</h3>
+                    <img src="data:image/png;base64,${visualizations.word_influence}" alt="Word Influence">
+                `;
+                vizContainer.appendChild(wordItem);
+            }
+        }
+        
+        // Show error
+        function showError(message) {
+            const errorElement = document.getElementById('error');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+        
+        // Check URL for batch ID
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const batchId = urlParams.get('batch_id');
+            
+            if (batchId) {
+                document.getElementById('batchId').value = batchId;
+                loadData();
+            }
+        }
+        
+        // Initialize
+        window.onload = function() {
+            checkUrlParams();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "commonjs",
+    "rootDir": "./",
+    "outDir": "./dist",
+    "strict": true,
+    "strictNullChecks": true, // Enable stricter null checks
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noImplicitAny": false,
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "noEmit": false, // Allow TypeScript to emit compiled files
+    "incremental": true,
+    "moduleResolution": "node",
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "baseUrl": ".", // Use the root directory as the base
+    "paths": {
+      "@/*": [
+        "./*"
+      ] // Alias for root directory
+    }
+  },
+  "include": [
+    "models/**/*.ts", // Include all TypeScript files in the models folder
+    "server/**/*.ts" // Include other folders if necessary
+    ,
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ] // Exclude unnecessary folders
+}
